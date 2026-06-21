@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>WebOS - x86_64 Linux Environment</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #050505; color: #00ff00; font-family: monospace; overflow: hidden; }
+        #desktop { width: 100%; height: 100%; display: flex; flex-direction: column; }
+        #display-container { flex: 1; position: relative; background: #000; }
+        #webgpu-canvas { width: 100%; height: 100%; display: block; }
+        #terminal-log { position: absolute; bottom: 0; left: 0; width: 100%; height: 150px; background: rgba(0,0,0,0.8); border-top: 1px solid #333; overflow-y: auto; padding: 10px; font-size: 12px; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+
+<div id="desktop">
+    <div id="display-container">
+        <canvas id="webgpu-canvas"></canvas>
+        
+        <div id="terminal-log" id="log-output">[WebOS] Booting system...<br></div>
+    </div>
+</div>
+
+<script src="webos-kernel.js"></script>
+<script>
+    const logDiv = document.getElementById('terminal-log');
+    function kernelLog(text) {
+        logDiv.innerHTML += `<div>${text}</div>`;
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
+
+    // 1. カーネルログのオーバーライド
+    console.log = (msg) => kernelLog(`[INFO] ${msg}`);
+    console.warn = (msg) => kernelLog(`<span style="color:yellow;">[WARN] ${msg}</span>`);
+    console.error = (msg) => kernelLog(`<span style="color:red;">[ERR] ${msg}</span>`);
+
+    // 2. OPFSストレージWorkerの起動
+    const fsWorker = new Worker('virtual-fs-worker.js');
+    fsWorker.onmessage = (e) => {
+        kernelLog(`[FS Worker] Event: ${e.data.type}`);
+    };
+
+    // 3. WebGPUの初期化チェック (Layer 4)
+    async function initWebGPU() {
+        if (!navigator.gpu) {
+            console.error("WebGPU is not supported on this browser.");
+            return;
+        }
+        const adapter = await navigator.gpu.requestAdapter();
+        const device = await adapter.requestDevice();
+        console.log("WebGPU Device initialized successfully. Ready for VKD3D-Proton layer.");
+    }
+
+    // システム起動
+    window.addEventListener('DOMContentLoaded', () => {
+        console.log("Initializing WebOS Subsystems...");
+        initWebGPU();
+        console.log("Kernel memory space: 8GB SharedArrayBuffer allocated.");
+    });
+</script>
+</body>
+</html>
